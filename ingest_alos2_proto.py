@@ -186,6 +186,33 @@ def gdal_translate(outfile, infile, options_string):
     return check_call(cmd,  shell=True)
 
 
+def post_process_geotiff(infile):
+    # removes nodata value from original geotiff file from jaxa
+    outfile = os.path.splitext(infile)[0] + "_processed.tif"
+    logging.info("Removing nodata from %s to %s" % infile, outfile)
+    options_string = '-of GTiff -a_nodata 0'
+    gdal_translate(infile, outfile, options_string)
+    return outfile
+
+
+def create_tiled_layer(prod_dir, layer, tiff_file, zoom=[0, 8]):
+    # create tiles from geotiff for facetView dispaly
+    output_dir = "{}/{}/tiles".format(prod_dir, layer)
+    logging.info("Generating tiles.")
+    zoom_i = zoom[0]
+    zoom_f = zoom[1]
+    while zoom_f > zoom_i:
+        try:
+            cmd = "gdal2tiles.py -z {}-{} -p mercator {} {}".format(zoom_i, zoom_f, tiff_file, output_dir)
+            logging.info("cmd: %s" % cmd)
+            check_call(cmd, shell=True)
+            break
+        except Exception as e:
+            logging.warn("Got exception running {}: {}".format(cmd, str(e)))
+            logging.warn("Traceback: {}".format(traceback.format_exc()))
+            zoom_f -= 1
+
+
 def create_product_browse(tiff_file):
     # TODO: the static scale of 7500 has been chosen! We need better means to scale it.
     logging.info("Creating browse png from %s" % tiff_file)
@@ -197,9 +224,10 @@ def create_product_browse(tiff_file):
     return
 
 
-def create_product_kmz(tiff_file, out_kmz):
+def create_product_kmz(tiff_file):
     # TODO: the static scale of 7500 has been chosen! We need better means to scale it.
     logging.info("Creating KMZ from %s" % tiff_file)
+    out_kmz = os.path.splitext(tiff_file)[0] + ".kmz"
     options_string = '-of KMLSUPEROVERLAY -ot Byte -scale 0 7500 0 255'
     gdal_translate(out_kmz, tiff_file, options_string)
     return
@@ -259,22 +287,27 @@ def ingest_alos2(download_url, file_type, oauth_url=None):
         json.dump(dataset, f, indent=2)
         f.close()
 
-    # create browse products
-    tiff_files = glob.glob(os.path.join(proddir, "*.tif"))
-    for tif_file in tiff_files:
-        create_product_browse(tif_file)
+    # create post products
+    tiff_regex = re.complile("IMG-([A-Z]{2})-ALOS2(.{27}}.tif")
+    tiff_files = [f for f in os.listdir(proddir) if tiff_regex.match(f)]
 
-    # create kmz products
     for tif_file in tiff_files:
-        if "IMG-HH" in tif_file:
-            out_kmz = os.path.join(proddir, dataset_name + ".kmz")
-            create_product_kmz(tif_file, out_kmz)
+        # process the geotiff to remove nodata
+        processed_tif = post_process_geotiff(tif_file)
+
+        # create the layer for facet view
+        layer = tiff_regex.match(tif_file).group(1)
+        create_tiled_layer(proddir, layer, processed_tif)
+
+        # create the browse pngs
+        create_product_browse(processed_tif)
+
+        # create the KMZs
+        create_product_kmz(tif_file)
 
     # remove unwanted zips
     shutil.rmtree(sec_zip_dir, ignore_errors=True)
     os.remove(pri_zip_path)
-    # TODO my suspicion, remove once done.
-    os.remove(os.path.join(proddir, dataset_name + ".kml"))
 
 
 if __name__ == "__main__":
