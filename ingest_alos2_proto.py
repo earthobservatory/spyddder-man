@@ -189,9 +189,9 @@ def gdal_translate(outfile, infile, options_string):
 def post_process_geotiff(infile):
     # removes nodata value from original geotiff file from jaxa
     outfile = os.path.splitext(infile)[0] + "_processed.tif"
-    logging.info("Removing nodata from %s to %s" % infile, outfile)
+    logging.info("Removing nodata from %s to %s" % (infile, outfile))
     options_string = '-of GTiff -a_nodata 0'
-    gdal_translate(infile, outfile, options_string)
+    gdal_translate(outfile, infile, options_string)
     return outfile
 
 
@@ -291,19 +291,20 @@ def ingest_alos2(download_url, file_type, oauth_url=None):
     tiff_regex = re.compile("IMG-([A-Z]{2})-ALOS2(.{27}).tif")
     tiff_files = [f for f in os.listdir(proddir) if tiff_regex.match(f)]
 
-    for tif_file in tiff_files:
+    for tf in tiff_files:
+        tif_file_path = os.path.join(proddir, tf);
         # process the geotiff to remove nodata
-        processed_tif = post_process_geotiff(tif_file)
+        processed_tif = post_process_geotiff(tif_file_path)
 
         # create the layer for facet view
-        layer = tiff_regex.match(tif_file).group(1)
+        layer = tiff_regex.match(tf).group(1)
         create_tiled_layer(proddir, layer, processed_tif)
 
         # create the browse pngs
         create_product_browse(processed_tif)
 
         # create the KMZs
-        create_product_kmz(tif_file)
+        create_product_kmz(processed_tif)
 
     # remove unwanted zips
     shutil.rmtree(sec_zip_dir, ignore_errors=True)
