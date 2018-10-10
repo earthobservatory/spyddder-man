@@ -277,15 +277,7 @@ def ingest_alos2(download_url, file_type, oauth_url=None):
     for f in files:
         shutil.move(os.path.join(product_dir, f), proddir)
 
-    # dump metadata
-    with open(os.path.join(proddir, dataset_name + ".met.json"), "w") as f:
-        json.dump(metadata, f, indent=2)
-        f.close()
-
-    # dump dataset
-    with open(os.path.join(proddir, dataset_name + ".dataset.json"), "w") as f:
-        json.dump(dataset, f, indent=2)
-        f.close()
+    tile_md = {"tiles": True, "tile_layers": []}
 
     # create post products
     tiff_regex = re.compile("IMG-([A-Z]{2})-ALOS2(.{27}).tif")
@@ -299,12 +291,25 @@ def ingest_alos2(download_url, file_type, oauth_url=None):
         # create the layer for facet view
         layer = tiff_regex.match(tf).group(1)
         create_tiled_layer(proddir, layer, processed_tif)
+        tile_md["tile_layers"].append(layer)
 
         # create the browse pngs
         create_product_browse(processed_tif)
 
         # create the KMZs
         create_product_kmz(processed_tif)
+
+    metadata.update(tile_md)
+
+    # dump metadata
+    with open(os.path.join(proddir, dataset_name + ".met.json"), "w") as f:
+        json.dump(metadata, f, indent=2)
+        f.close()
+
+    # dump dataset
+    with open(os.path.join(proddir, dataset_name + ".dataset.json"), "w") as f:
+        json.dump(dataset, f, indent=2)
+        f.close()
 
     # remove unwanted zips
     shutil.rmtree(sec_zip_dir, ignore_errors=True)
