@@ -197,7 +197,7 @@ def post_process_geotiff(infile):
 
 def create_tiled_layer(prod_dir, layer, tiff_file, zoom=[0, 8]):
     # create tiles from geotiff for facetView dispaly
-    output_dir = "{}/{}/tiles".format(prod_dir, layer)
+    output_dir = "{}/tiles/{}".format(prod_dir, layer)
     logging.info("Generating tiles.")
     zoom_i = zoom[0]
     zoom_f = zoom[1]
