@@ -288,7 +288,7 @@ def ingest_alos2(download_url, file_type, oauth_url=None):
         f.close()
 
     # create post products
-    tiff_regex = re.complile("IMG-([A-Z]{2})-ALOS2(.{27}}.tif")
+    tiff_regex = re.compile("IMG-([A-Z]{2})-ALOS2(.{27}).tif")
     tiff_files = [f for f in os.listdir(proddir) if tiff_regex.match(f)]
 
     for tif_file in tiff_files:
