@@ -203,7 +203,7 @@ def create_tiled_layer(prod_dir, layer, tiff_file, zoom=[0, 8]):
     zoom_f = zoom[1]
     while zoom_f > zoom_i:
         try:
-            cmd = "gdal2tiles.py -z {}-{} -p mercator {} {}".format(zoom_i, zoom_f, tiff_file, output_dir)
+            cmd = "gdal2tiles.py -z {}-{} -p mercator -a 0,0,0 {} {}".format(zoom_i, zoom_f, tiff_file, output_dir)
             logging.info("cmd: %s" % cmd)
             check_call(cmd, shell=True)
             break
