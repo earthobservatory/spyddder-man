@@ -209,6 +209,7 @@ def create_tiled_layer(prod_dir, layer, tiff_file, zoom=[0, 8]):
     # TODO: for debug
     check_call("gdal2tiles.py --version", shell=True)
     check_call("which gdal2tiles.py", shell=True)
+    check_call("echo $GDAL_DATA", shell=True)
 
 
     while zoom_f > zoom_i:
