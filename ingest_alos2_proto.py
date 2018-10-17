@@ -210,6 +210,8 @@ def create_tiled_layer(prod_dir, layer, tiff_file, zoom=[0, 8]):
             cmd = "gdal2tiles.py -z {}-{} -p mercator -a 0,0,0 {} {}".format(zoom_i, zoom_f, tiff_file, output_dir)
             logging.info("cmd: %s" % cmd)
             check_call(cmd, shell=True)
+            #TODO: for degug
+            check_call("gdal2tiles.py -version", shell=True)
             break
         except Exception as e:
             logging.warn("Got exception running {}: {}".format(cmd, str(e)))
