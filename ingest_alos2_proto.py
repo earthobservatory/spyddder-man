@@ -205,13 +205,17 @@ def create_tiled_layer(prod_dir, layer, tiff_file, zoom=[0, 8]):
     logging.info("Generating tiles.")
     zoom_i = zoom[0]
     zoom_f = zoom[1]
+
+    # TODO: for debug
+    check_call("gdal2tiles.py --version", shell=True)
+    check_call("which gdal2tiles.py", shell=True)
+
+
     while zoom_f > zoom_i:
         try:
             cmd = "gdal2tiles.py -z {}-{} -p mercator -a 0,0,0 {} {}".format(zoom_i, zoom_f, tiff_file, output_dir)
             logging.info("cmd: %s" % cmd)
             check_call(cmd, shell=True)
-            #TODO: for degug
-            check_call("gdal2tiles.py -version", shell=True)
             break
         except Exception as e:
             logging.warn("Got exception running {}: {}".format(cmd, str(e)))
