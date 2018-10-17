@@ -45,6 +45,9 @@ ALL_TYPES = []
 ZIP_TYPE = ["zip"]
 ALL_TYPES.extend(ZIP_TYPE)
 
+# scale range
+SCALE_RANGE=[0, 7500]
+
 # tar types
 # TAR_TYPE = ["tbz2", "tgz", "bz2", "gz"]
 # ALL_TYPES.extend(TAR_TYPE)
@@ -189,8 +192,9 @@ def gdal_translate(outfile, infile, options_string):
 def post_process_geotiff(infile):
     # removes nodata value from original geotiff file from jaxa
     outfile = os.path.splitext(infile)[0] + "_processed.tif"
-    logging.info("Removing nodata from %s to %s" % (infile, outfile))
-    options_string = '-of GTiff -a_nodata 0'
+    logging.info("Removing nodata and scaling intensity from %s to %s. Scale intensity at %s"
+                 % (infile, outfile, SCALE_RANGE))
+    options_string = '-of GTiff -scale {} {} 0 65535 -a_nodata 0'.format(SCALE_RANGE[0], SCALE_RANGE[1])
     gdal_translate(outfile, infile, options_string)
     return outfile
 
@@ -216,7 +220,7 @@ def create_tiled_layer(prod_dir, layer, tiff_file, zoom=[0, 8]):
 def create_product_browse(tiff_file):
     # TODO: the static scale of 7500 has been chosen! We need better means to scale it.
     logging.info("Creating browse png from %s" % tiff_file)
-    options_string = '-of PNG -ot Byte -scale 0 7500 0 255 -outsize 10% 10%'
+    options_string = '-of PNG -ot Byte -outsize 10% 10%'
     out_file = os.path.splitext(tiff_file)[0] + '.browse.png'
     out_file_small = os.path.splitext(tiff_file)[0] + '.browse_small.png'
     gdal_translate(out_file, tiff_file, options_string)
@@ -228,7 +232,7 @@ def create_product_kmz(tiff_file):
     # TODO: the static scale of 7500 has been chosen! We need better means to scale it.
     logging.info("Creating KMZ from %s" % tiff_file)
     out_kmz = os.path.splitext(tiff_file)[0] + ".kmz"
-    options_string = '-of KMLSUPEROVERLAY -ot Byte -scale 0 7500 0 255'
+    options_string = '-of KMLSUPEROVERLAY -ot Byte'
     gdal_translate(out_kmz, tiff_file, options_string)
     return
 
@@ -296,8 +300,8 @@ def ingest_alos2(download_url, file_type, oauth_url=None):
         # create the browse pngs
         create_product_browse(processed_tif)
 
-        # create the KMZs
-        create_product_kmz(processed_tif)
+        # TODO: add back if needed create the KMZs
+        # create_product_kmz(processed_tif)
 
     metadata.update(tile_md)
 
