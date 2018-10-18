@@ -194,7 +194,7 @@ def process_geotiff_disp(infile):
     outfile = os.path.splitext(infile)[0] + "_disp.tif"
     logging.info("Removing nodata and scaling intensity from %s to %s. Scale intensity at %s"
                  % (infile, outfile, SCALE_RANGE))
-    options_string = '-of GTiff -ot Byte -scale {} {} 0 255 -a_nodata 0 -outsize 20% 20%'.format(SCALE_RANGE[0], SCALE_RANGE[1])
+    options_string = '-of GTiff -ot Byte -scale {} {} 0 255 -a_nodata 0'.format(SCALE_RANGE[0], SCALE_RANGE[1])
     gdal_translate(outfile, infile, options_string)
     return outfile
 
@@ -209,8 +209,7 @@ def create_tiled_layer(prod_dir, layer, tiff_file, zoom=[0, 8]):
     while zoom_f > zoom_i:
         try:
             # TODO: decide if we want incermental zooms later
-            cmd = "gdal2tiles.py -p mercator -a 0,0,0 {} {}".format(tiff_file, output_dir)
-            # cmd = "gdal2tiles.py -z {}-{} -p mercator -a 0,0,0 {} {}".format(zoom_i, zoom_f, tiff_file, output_dir)
+            cmd = "gdal2tiles.py -z {}-{} -p mercator -a 0,0,0 {} {}".format(zoom_i, zoom_f, tiff_file, output_dir)
             logging.info("cmd: %s" % cmd)
             check_call(cmd, shell=True)
             break
@@ -222,7 +221,7 @@ def create_tiled_layer(prod_dir, layer, tiff_file, zoom=[0, 8]):
 
 def create_product_browse(tiff_file):
     logging.info("Creating browse png from %s" % tiff_file)
-    options_string = '-of PNG'
+    options_string = '-of PNG -outsize 10% 10%'
     out_file = os.path.splitext(tiff_file)[0] + '.browse.png'
     out_file_small = os.path.splitext(tiff_file)[0] + '.browse_small.png'
     gdal_translate(out_file, tiff_file, options_string)
