@@ -189,12 +189,12 @@ def gdal_translate(outfile, infile, options_string):
     return check_call(cmd,  shell=True)
 
 
-def post_process_geotiff(infile):
+def process_geotiff_disp(infile):
     # removes nodata value from original geotiff file from jaxa
-    outfile = os.path.splitext(infile)[0] + "_processed.tif"
+    outfile = os.path.splitext(infile)[0] + "_disp.tif"
     logging.info("Removing nodata and scaling intensity from %s to %s. Scale intensity at %s"
                  % (infile, outfile, SCALE_RANGE))
-    options_string = '-of GTiff -scale {} {} 0 65535 -a_nodata 0'.format(SCALE_RANGE[0], SCALE_RANGE[1])
+    options_string = '-of GTiff -ot Byte -scale {} {} 0 255 -a_nodata 0 -outsize 20% 20%'.format(SCALE_RANGE[0], SCALE_RANGE[1])
     gdal_translate(outfile, infile, options_string)
     return outfile
 
@@ -206,15 +206,11 @@ def create_tiled_layer(prod_dir, layer, tiff_file, zoom=[0, 8]):
     zoom_i = zoom[0]
     zoom_f = zoom[1]
 
-    # TODO: for debug
-    check_call("gdal2tiles.py --version", shell=True)
-    check_call("which gdal2tiles.py", shell=True)
-    check_call("echo $GDAL_DATA", shell=True)
-
-
     while zoom_f > zoom_i:
         try:
-            cmd = "gdal2tiles.py -z {}-{} -p mercator -a 0,0,0 {} {}".format(zoom_i, zoom_f, tiff_file, output_dir)
+            # TODO: decide if we want incermental zooms later
+            cmd = "gdal2tiles.py -p mercator -a 0,0,0 {} {}".format(tiff_file, output_dir)
+            # cmd = "gdal2tiles.py -z {}-{} -p mercator -a 0,0,0 {} {}".format(zoom_i, zoom_f, tiff_file, output_dir)
             logging.info("cmd: %s" % cmd)
             check_call(cmd, shell=True)
             break
@@ -225,9 +221,8 @@ def create_tiled_layer(prod_dir, layer, tiff_file, zoom=[0, 8]):
 
 
 def create_product_browse(tiff_file):
-    # TODO: the static scale of 7500 has been chosen! We need better means to scale it.
     logging.info("Creating browse png from %s" % tiff_file)
-    options_string = '-of PNG -ot Byte -outsize 10% 10%'
+    options_string = '-of PNG'
     out_file = os.path.splitext(tiff_file)[0] + '.browse.png'
     out_file_small = os.path.splitext(tiff_file)[0] + '.browse_small.png'
     gdal_translate(out_file, tiff_file, options_string)
@@ -236,7 +231,6 @@ def create_product_browse(tiff_file):
 
 
 def create_product_kmz(tiff_file):
-    # TODO: the static scale of 7500 has been chosen! We need better means to scale it.
     logging.info("Creating KMZ from %s" % tiff_file)
     out_kmz = os.path.splitext(tiff_file)[0] + ".kmz"
     options_string = '-of KMLSUPEROVERLAY -ot Byte'
@@ -297,18 +291,18 @@ def ingest_alos2(download_url, file_type, oauth_url=None):
     for tf in tiff_files:
         tif_file_path = os.path.join(proddir, tf);
         # process the geotiff to remove nodata
-        processed_tif = post_process_geotiff(tif_file_path)
+        processed_tif_disp = process_geotiff_disp(tif_file_path)
 
         # create the layer for facet view
         layer = tiff_regex.match(tf).group(1)
-        create_tiled_layer(proddir, layer, processed_tif)
+        create_tiled_layer(proddir, layer, processed_tif_disp)
         tile_md["tile_layers"].append(layer)
 
         # create the browse pngs
-        create_product_browse(processed_tif)
+        create_product_browse(processed_tif_disp)
 
         # TODO: add back if needed create the KMZs
-        # create_product_kmz(processed_tif)
+        create_product_kmz(processed_tif_disp)
 
     metadata.update(tile_md)
 
