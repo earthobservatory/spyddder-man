@@ -315,7 +315,8 @@ def ingest_alos2(download_url, file_type, oauth_url=None):
 
     # remove unwanted zips
     shutil.rmtree(sec_zip_dir, ignore_errors=True)
-    os.remove(pri_zip_path)
+    # retaining primary zip, we can delete it if we want
+    # os.remove(pri_zip_path)
 
 
 if __name__ == "__main__":
