@@ -301,7 +301,6 @@ def ingest_alos2(download_url, file_type, oauth_url=None):
         # create the browse pngs
         create_product_browse(processed_tif_disp)
 
-        # TODO: add back if needed create the KMZs
         create_product_kmz(processed_tif_disp)
 
     metadata.update(tile_md)
