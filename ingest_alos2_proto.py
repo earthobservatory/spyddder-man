@@ -48,9 +48,6 @@ ALL_TYPES.extend(ZIP_TYPE)
 # scale range
 SCALE_RANGE=[0, 7500]
 
-# tar types
-# TAR_TYPE = ["tbz2", "tgz", "bz2", "gz"]
-# ALL_TYPES.extend(TAR_TYPE)
 
 
 def verify(path, file_type):
@@ -319,10 +316,12 @@ def ingest_alos2(download_url, file_type, oauth_url=None):
 
         create_product_kmz(processed_tif_disp)
 
+        # TODO: remove this if location from summary.txt is enough
         if not aoi_done:
             location = get_real_aoi(processed_tif_disp)
             aoi_done = True
 
+    # TODO: remove this if location from summary.txt is enough
     # udpate the location
     metadata['location'] = location
     dataset['location'] = location
