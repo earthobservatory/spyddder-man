@@ -302,7 +302,7 @@ def ingest_alos2(download_url, file_type, oauth_url=None):
 
     tile_md = {"tiles": True, "tile_layers": []}
 
-    AOI_done = False
+    aoi_done = False
 
     for tf in tiff_files:
         tif_file_path = os.path.join(proddir, tf)
@@ -319,9 +319,9 @@ def ingest_alos2(download_url, file_type, oauth_url=None):
 
         create_product_kmz(processed_tif_disp)
 
-        if not AOI_done:
+        if not aoi_done:
             location = get_real_aoi(processed_tif_disp)
-            AOI_done = True
+            aoi_done = True
 
     # udpate the location
     metadata['location'] = location
