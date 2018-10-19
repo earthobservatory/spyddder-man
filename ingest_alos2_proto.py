@@ -186,8 +186,23 @@ def create_dataset(metadata):
 
 def gdal_translate(outfile, infile, options_string):
     cmd = "gdal_translate {} {} {}".format(options_string, infile, outfile)
+    logging.info("cmd: %s" % cmd)
     return check_call(cmd,  shell=True)
 
+
+def get_real_aoi(processed_tif):
+    file_basename = os.path.splitext(processed_tif)[0]
+    cmds = ["gdalwarp -dstnodata 0 -dstalpha -of vrt -t_srs EPSG:4326 -dstnodata 0 {} {}.vrt".format(processed_tif, file_basename),
+            "gdal_polygonize.py {}.vrt -b 2 -f 'GeoJSON' {}.geojson".format(file_basename, file_basename)]
+
+    for cmd in cmds:
+        logging.info("cmd: %s" % cmd)
+        check_call(cmd, shell=True)
+
+    with open('{}.geojson'.format(file_basename)) as f:
+        coord_data = json.load(f)
+
+    return coord_data["features"][0]["geometry"]["coordinates"]
 
 def process_geotiff_disp(infile):
     # removes nodata value from original geotiff file from jaxa
@@ -280,14 +295,17 @@ def ingest_alos2(download_url, file_type, oauth_url=None):
     for f in files:
         shutil.move(os.path.join(product_dir, f), proddir)
 
-    tile_md = {"tiles": True, "tile_layers": []}
 
     # create post products
     tiff_regex = re.compile("IMG-([A-Z]{2})-ALOS2(.{27}).tif")
     tiff_files = [f for f in os.listdir(proddir) if tiff_regex.match(f)]
 
+    tile_md = {"tiles": True, "tile_layers": []}
+
+    AOI_done = False
+
     for tf in tiff_files:
-        tif_file_path = os.path.join(proddir, tf);
+        tif_file_path = os.path.join(proddir, tf)
         # process the geotiff to remove nodata
         processed_tif_disp = process_geotiff_disp(tif_file_path)
 
@@ -301,6 +319,15 @@ def ingest_alos2(download_url, file_type, oauth_url=None):
 
         create_product_kmz(processed_tif_disp)
 
+        if not AOI_done:
+            location = get_real_aoi(processed_tif_disp)
+            AOI_done = True
+
+    # udpate the location
+    metadata['location'] = location
+    dataset['location'] = location
+
+    #udpate the tiles
     metadata.update(tile_md)
 
     # dump metadata
