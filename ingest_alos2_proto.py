@@ -322,13 +322,14 @@ def ingest_alos2(download_url, file_type, oauth_url=None):
 
         # TODO: remove this if location from summary.txt is enough
         if not aoi_done:
-            location = get_real_aoi(processed_tif_disp)
+            coordinates = get_real_aoi(processed_tif_disp)
+            # print coordinates
             aoi_done = True
 
     # TODO: remove this if location from summary.txt is enough
     # udpate the location
-    metadata['location'] = location
-    dataset['location'] = location
+    metadata['location']['coordinates'] = coordinates
+    dataset['location']['coordinates'] = coordinates
 
     #udpate the tiles
     metadata.update(tile_md)
