@@ -199,6 +199,10 @@ def get_real_aoi(processed_tif):
     with open('{}.geojson'.format(file_basename)) as f:
         coord_data = json.load(f)
 
+    if coord_data:
+        os.remove("{}.vrt".format(file_basename))
+        os.remove("{}.geojson".format(file_basename))
+
     return coord_data["features"][0]["geometry"]["coordinates"]
 
 def process_geotiff_disp(infile):
