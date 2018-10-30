@@ -15,10 +15,11 @@ import zipfile
 from urlparse import urlparse
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from requests.packages.urllib3.exceptions import InsecurePlatformWarning
-
 import boto
-
 import osaka.main
+import numpy as np
+import scipy.spatial
+from osgeo import gdal
 
 import ConfigParser
 import StringIO
@@ -186,24 +187,62 @@ def gdal_translate(outfile, infile, options_string):
     logging.info("cmd: %s" % cmd)
     return check_call(cmd,  shell=True)
 
+def get_bounding_polygon(vrt_file):
+    '''
+    Get the minimum bounding region
+    @param path - path to h5 file from which to read TS data
+    '''
+    ds = gdal.Open(vrt_file)
+    #Read out the first data frame, lats vector and lons vector.
+    data = np.array(ds.GetRasterBand(1).ReadAsArray())
+    print("Array size of data {}".format(data.shape))
+    lats, lons = get_geocoded_coords(vrt_file)
+    print("Array size of lats {}".format(lats.shape))
+    print("Array size of lons {}".format(lons.shape))
 
-# def get_real_aoi(processed_tif):
-#     file_basename = os.path.splitext(processed_tif)[0]
-#     cmds = ["gdalwarp -dstnodata 0 -dstalpha -of vrt -t_srs EPSG:4326 -dstnodata 0 {} {}.vrt".format(processed_tif, file_basename),
-#             "gdal_polygonize.py {}.vrt -b 2 -f 'GeoJSON' {}.geojson".format(file_basename, file_basename)]
-#
-#     for cmd in cmds:
-#         logging.info("cmd: %s" % cmd)
-#         check_call(cmd, shell=True)
-#
-#     with open('{}.geojson'.format(file_basename)) as f:
-#         coord_data = json.load(f)
-#
-#     if coord_data:
-#         os.remove("{}.vrt".format(file_basename))
-#         os.remove("{}.geojson".format(file_basename))
-#
-#     return coord_data["features"][0]["geometry"]["coordinates"]
+    #Create a grid of lon, lat pairs
+    coords = np.dstack(np.meshgrid(lons,lats))
+    #Calculate any point in the data that is not 0, and grab the coordinates
+    inx = np.nonzero(data)
+    points = coords[inx]
+    #Calculate the convex-hull of the data points.  This will be a mimimum
+    #bounding convex-polygon.
+    hull = scipy.spatial.ConvexHull(points)
+    #Harvest the points and make it a loop
+    pts = [list(pt) for pt in hull.points[hull.vertices]]
+    pts.append(pts[0])
+    return pts
+
+
+def get_geocoded_coords(vrt_file):
+    """Return geocoded coordinates of radar pixels."""
+
+    # extract geo-coded corner coordinates
+    ds = gdal.Open(vrt_file)
+    gt = ds.GetGeoTransform()
+    cols = ds.RasterXSize
+    rows = ds.RasterYSize
+    lon_arr = list(range(0, cols))
+    lat_arr = list(range(0, rows))
+    lons = np.empty((cols,))
+    lats = np.empty((rows,))
+    for py in lat_arr:
+        lats[py] = gt[3] + (py * gt[5])
+    for px in lon_arr:
+        lons[px] = gt[0] + (px * gt[1])
+    return lats, lons
+
+# ONLY FOR L2.1 which is Geo-coded (Map projection based on north-oriented map direction)
+def get_swath_polygon_coords(processed_tif):
+    # create vrt file with wgs84 coordinates
+    file_basename = os.path.splitext(processed_tif)[0]
+    cmd = "gdalwarp -dstnodata 0 -dstalpha -of vrt -t_srs EPSG:4326 {} {}.vrt".format(processed_tif, file_basename)
+    logging.info("cmd: %s" % cmd)
+    check_call(cmd, shell=True)
+
+    polygon_coords = get_bounding_polygon("{}.vrt".format(file_basename))
+
+    return polygon_coords
 
 def process_geotiff_disp(infile):
     # removes nodata value from original geotiff file from jaxa
@@ -303,6 +342,10 @@ def ingest_alos2(download_url, file_type, oauth_url=None):
 
     tile_md = {"tiles": True, "tile_layers": []}
 
+    # we need to override the coordinates bbox to cover actula swath if dataset is Level2.1
+    # L2.1 is Geo-coded (Map projection based on north-oriented map direction)
+    need_swath_poly = "2.1" in dataset_name
+
     for tf in tiff_files:
         tif_file_path = os.path.join(proddir, tf)
         # process the geotiff to remove nodata
@@ -317,6 +360,15 @@ def ingest_alos2(download_url, file_type, oauth_url=None):
         create_product_browse(processed_tif_disp)
 
         create_product_kmz(processed_tif_disp)
+
+        if need_swath_poly:
+            coordinates = get_swath_polygon_coords(processed_tif_disp)
+            # Override cooirdinates from summary.txt
+            metadata['location']['coordinates'] = [coordinates]
+            dataset['location']['coordinates'] = [coordinates]
+            # do this once only
+            need_swath_poly = False
+
 
     #udpate the tiles
     metadata.update(tile_md)
