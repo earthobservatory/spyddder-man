@@ -20,4 +20,14 @@ if [ -z "${2}" ]
     exit 1
 fi
 
-${BASE_PATH}/ingest_alos2_proto.py ${1} ${2}
+path_num=''
+if [ -z "$3" ]
+then
+    echo "path_number_to_check is not specified"
+else
+    path_num="--path_number_to_check \"${3}\""
+    echo "path_number_to_check: ${path_num}"
+fi
+
+
+${BASE_PATH}/ingest_alos2_proto.py ${1} ${2} ${path_num}

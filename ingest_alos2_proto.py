@@ -411,7 +411,7 @@ if __name__ == "__main__":
                                              "in .netrc)")
     parser.add_argument("file_type", help="download file type to verify",
                         choices=ALL_TYPES)
-    parser.add_argument("path_number_to_check", help="Path number provided from ALOS2 Ordering system to "
+    parser.add_argument("--path_number_to_check", help="Path number provided from ALOS2 Ordering system to "
                                                      "check against empirical formulation.", required=False)
     parser.add_argument("--oauth_url", help="OAuth authentication URL " +
                                             "(credentials stored in " +
