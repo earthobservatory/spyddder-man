@@ -116,7 +116,9 @@ def create_metadata(alos2_md_file, download_url):
     metadata['spacecraftName'] = dataset_name[0:5]
     metadata['dataset_type'] = dataset_name[0:5]
     metadata['orbitNumber'] = int(dataset_name[5:10])
-    metadata['scene_frame_number'] = int(dataset_name[10:14])
+    metadata['frameID'] = int(dataset_name[10:14])
+    # this emprical forumla to get path/track number is derived from Eric Lindsey's modeling and fits for all L1.1 data
+    metadata['trackNumber'] = int((14*metadata['orbitNumber']+24) % 207)
     prod_datetime = datetime.datetime.strptime(dataset_name[15:21], '%y%m%d')
     prod_date = prod_datetime.strftime("%Y-%m-%d")
     metadata['prod_date'] = prod_date
@@ -195,10 +197,10 @@ def get_bounding_polygon(vrt_file):
     ds = gdal.Open(vrt_file)
     #Read out the first data frame, lats vector and lons vector.
     data = np.array(ds.GetRasterBand(1).ReadAsArray())
-    print("Array size of data {}".format(data.shape))
+    logging.info("Array size of data {}".format(data.shape))
     lats, lons = get_geocoded_coords(vrt_file)
-    print("Array size of lats {}".format(lats.shape))
-    print("Array size of lons {}".format(lons.shape))
+    logging.info("Array size of lats {}".format(lats.shape))
+    logging.info("Array size of lons {}".format(lons.shape))
 
     #Create a grid of lon, lat pairs
     coords = np.dstack(np.meshgrid(lons,lats))
@@ -210,6 +212,7 @@ def get_bounding_polygon(vrt_file):
     hull = scipy.spatial.ConvexHull(points)
     #Harvest the points and make it a loop
     pts = [list(pt) for pt in hull.points[hull.vertices]]
+    logging.info("Number of vertices: {}".format(len(pts)))
     pts.append(pts[0])
     return pts
 
@@ -240,7 +243,9 @@ def get_swath_polygon_coords(processed_tif):
     logging.info("cmd: %s" % cmd)
     check_call(cmd, shell=True)
 
+    logging.info('Getting polygon of satellite footprint swath.')
     polygon_coords = get_bounding_polygon("{}.vrt".format(file_basename))
+    logging.info("Coordinates of subswath polygon: {}".format(polygon_coords))
 
     return polygon_coords
 
@@ -254,9 +259,8 @@ def process_geotiff_disp(infile):
     return outfile
 
 
-def create_tiled_layer(prod_dir, layer, tiff_file, zoom=[0, 8]):
+def create_tiled_layer(output_dir, tiff_file, zoom=[0, 8]):
     # create tiles from geotiff for facetView dispaly
-    output_dir = "{}/tiles/{}".format(prod_dir, layer)
     logging.info("Generating tiles.")
     zoom_i = zoom[0]
     zoom_f = zoom[1]
@@ -291,7 +295,7 @@ def create_product_kmz(tiff_file):
     return
 
 
-def ingest_alos2(download_url, file_type, oauth_url=None):
+def ingest_alos2(download_url, file_type, path_number=None, oauth_url=None):
     """Download file, push to repo and submit job for extraction."""
 
     # get filename
@@ -323,6 +327,15 @@ def ingest_alos2(download_url, file_type, oauth_url=None):
     alos2_md_file = os.path.join(product_dir, "summary.txt")
     metadata = create_metadata(alos2_md_file, download_url)
 
+    #checks path number formulation:
+    if path_number:
+        logging.info("Checking formulation of path number against manual input path number:")
+        if path_number != metadata['trackNumber']:
+            raise RuntimeError("There might be an error in the formulation of path number. "
+                               "Formulated path_number: {} | Manual input path_number: {}"
+                               .format(metadata['trackNumber'], path_number))
+
+
     # create dataset.json
     dataset = create_dataset(metadata)
 
@@ -345,16 +358,18 @@ def ingest_alos2(download_url, file_type, oauth_url=None):
     # we need to override the coordinates bbox to cover actula swath if dataset is Level2.1
     # L2.1 is Geo-coded (Map projection based on north-oriented map direction)
     need_swath_poly = "2.1" in dataset_name
+    tile_output_dir = "{}/tiles/".format(proddir)
 
     for tf in tiff_files:
         tif_file_path = os.path.join(proddir, tf)
         # process the geotiff to remove nodata
         processed_tif_disp = process_geotiff_disp(tif_file_path)
 
-        # create the layer for facet view
-        layer = tiff_regex.match(tf).group(1)
-        create_tiled_layer(proddir, layer, processed_tif_disp)
-        tile_md["tile_layers"].append(layer)
+        # create the layer for facet view (only one layer created)
+        if not os.path.isdir(tile_output_dir):
+            layer = tiff_regex.match(tf).group(1)
+            create_tiled_layer(os.path.join(tile_output_dir, layer), processed_tif_disp, zoom=[0, 14])
+            tile_md["tile_layers"].append(layer)
 
         # create the browse pngs
         create_product_browse(processed_tif_disp)
@@ -396,6 +411,8 @@ if __name__ == "__main__":
                                              "in .netrc)")
     parser.add_argument("file_type", help="download file type to verify",
                         choices=ALL_TYPES)
+    parser.add_argument("path_number_to_check", help="Path number provided from ALOS2 Ordering system to "
+                                                     "check against empirical formulation.", required=False)
     parser.add_argument("--oauth_url", help="OAuth authentication URL " +
                                             "(credentials stored in " +
                                             ".netrc)", required=False)
@@ -403,7 +420,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     try:
-        ingest_alos2(args.download_url, args.file_type, oauth_url=args.oauth_url)
+        ingest_alos2(args.download_url, args.file_type, path_number=args.path_number_to_check, oauth_url=args.oauth_url)
     except Exception as e:
         with open('_alt_error.txt', 'a') as f:
             f.write("%s\n" % str(e))
