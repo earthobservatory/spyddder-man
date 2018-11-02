@@ -25,7 +25,7 @@ if [ -z "$3" ]
 then
     echo "path_number_to_check is not specified"
 else
-    path_num="--path_number_to_check \"${3}\""
+    path_num="--path_number_to_check ${3}"
     echo "path_number_to_check: ${path_num}"
 fi
 
