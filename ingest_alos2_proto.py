@@ -329,11 +329,13 @@ def ingest_alos2(download_url, file_type, path_number=None, oauth_url=None):
 
     #checks path number formulation:
     if path_number:
-        logging.info("Checking formulation of path number against manual input path number:")
-        if int(float(path_number)) != metadata['trackNumber']:
+        path_num = int(float(path_number))
+        logging.info("Checking manual input path number {} against formulated path number {}"
+                     .format(path_num, metadata['trackNumber']))
+        if path_num != metadata['trackNumber']:
             raise RuntimeError("There might be an error in the formulation of path number. "
                                "Formulated path_number: {} | Manual input path_number: {}"
-                               .format(metadata['trackNumber'], int(float(path_number))))
+                               .format(metadata['trackNumber'], path_num))
 
 
     # create dataset.json
